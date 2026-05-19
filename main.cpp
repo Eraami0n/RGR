@@ -1,6 +1,6 @@
 #include "MainForm.h"
 
-int main() {
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
     MainForm form;
-    return form.Run(GetModuleHandle(nullptr));
+    return form.Run(hInstance);
 }
