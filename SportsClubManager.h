@@ -1,8 +1,14 @@
 #pragma once
+#include <windows.h>
+#include <commctrl.h>
 #include <vector>
 #include <string>
-#include <fstream>
-#include <algorithm>
+#include <iostream>
+#include <sstream>
+#include <iomanip>
+
+// Forward declarations
+class SportsClubManager;
 
 struct Athlete {
     std::string id;
@@ -59,24 +65,30 @@ public:
     void editAthlete(const std::string& id, const std::string& name, const std::string& category,
                      const std::string& phone, double fee);
     std::vector<Athlete>& getAthletes();
+    Athlete* findAthlete(const std::string& id);
 
     // Training management
     void addTraining(const std::string& id, const std::string& date, const std::string& time,
                      const std::string& trainer, const std::string& location, int participants);
     void removeTraining(const std::string& id);
+    void editTraining(const std::string& id, const std::string& date, const std::string& time,
+                      const std::string& trainer, const std::string& location, int participants);
     std::vector<Training>& getTrainings();
+    Training* findTraining(const std::string& id);
 
     // Payment management
     void addPayment(const std::string& athleteId, const std::string& athleteName,
                     double amount, const std::string& date, bool isPaid);
     void updatePaymentStatus(const std::string& athleteId, bool isPaid);
     std::vector<Payment>& getPayments();
+    std::vector<Payment> getAthletePayments(const std::string& athleteId);
 
     // Statistics
     int getTotalAthletes() const;
     double getTotalRevenue() const;
     int getUnpaidPayments() const;
     double getMonthlyRevenue(const std::string& month) const;
+    std::string getStatisticsString() const;
 
     // Data persistence
     void saveData() const;

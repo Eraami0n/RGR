@@ -1,5 +1,7 @@
 #include "SportsClubManager.h"
-#include <iostream>
+#include <algorithm>
+#include <fstream>
+#include <ctime>
 
 SportsClubManager::SportsClubManager() {
     loadData();
@@ -9,27 +11,36 @@ SportsClubManager::~SportsClubManager() {
     saveData();
 }
 
+// ===== ATHLETE MANAGEMENT =====
 void SportsClubManager::addAthlete(const std::string& id, const std::string& name,
                                    const std::string& category, const std::string& phone, double fee) {
-    athletes.emplace_back(id, name, category, phone, fee);
+    if (findAthlete(id) == nullptr) {
+        athletes.emplace_back(id, name, category, phone, fee);
+    }
 }
 
 void SportsClubManager::removeAthlete(const std::string& id) {
-    athletes.erase(std::remove_if(athletes.begin(), athletes.end(),
-                                  [&id](const Athlete& a) { return a.id == id; }),
-                   athletes.end());
+    // Remove athlete
+    auto it = std::find_if(athletes.begin(), athletes.end(),
+                          [&id](const Athlete& a) { return a.id == id; });
+    if (it != athletes.end()) {
+        athletes.erase(it);
+    }
+
+    // Remove associated payments
+    auto pay_it = std::remove_if(payments.begin(), payments.end(),
+                                 [&id](const Payment& p) { return p.athleteId == id; });
+    payments.erase(pay_it, payments.end());
 }
 
 void SportsClubManager::editAthlete(const std::string& id, const std::string& name,
                                     const std::string& category, const std::string& phone, double fee) {
-    for (auto& athlete : athletes) {
-        if (athlete.id == id) {
-            athlete.name = name;
-            athlete.category = category;
-            athlete.phone = phone;
-            athlete.monthlyFee = fee;
-            break;
-        }
+    Athlete* athlete = findAthlete(id);
+    if (athlete != nullptr) {
+        athlete->name = name;
+        athlete->category = category;
+        athlete->phone = phone;
+        athlete->monthlyFee = fee;
     }
 }
 
@@ -37,22 +48,59 @@ std::vector<Athlete>& SportsClubManager::getAthletes() {
     return athletes;
 }
 
+Athlete* SportsClubManager::findAthlete(const std::string& id) {
+    for (auto& athlete : athletes) {
+        if (athlete.id == id) {
+            return &athlete;
+        }
+    }
+    return nullptr;
+}
+
+// ===== TRAINING MANAGEMENT =====
 void SportsClubManager::addTraining(const std::string& id, const std::string& date,
                                     const std::string& time, const std::string& trainer,
                                     const std::string& location, int participants) {
-    trainings.emplace_back(id, date, time, trainer, location, participants);
+    if (findTraining(id) == nullptr) {
+        trainings.emplace_back(id, date, time, trainer, location, participants);
+    }
 }
 
 void SportsClubManager::removeTraining(const std::string& id) {
-    trainings.erase(std::remove_if(trainings.begin(), trainings.end(),
-                                   [&id](const Training& t) { return t.id == id; }),
-                    trainings.end());
+    auto it = std::find_if(trainings.begin(), trainings.end(),
+                           [&id](const Training& t) { return t.id == id; });
+    if (it != trainings.end()) {
+        trainings.erase(it);
+    }
+}
+
+void SportsClubManager::editTraining(const std::string& id, const std::string& date,
+                                     const std::string& time, const std::string& trainer,
+                                     const std::string& location, int participants) {
+    Training* training = findTraining(id);
+    if (training != nullptr) {
+        training->date = date;
+        training->time = time;
+        training->trainer = trainer;
+        training->location = location;
+        training->participants = participants;
+    }
 }
 
 std::vector<Training>& SportsClubManager::getTrainings() {
     return trainings;
 }
 
+Training* SportsClubManager::findTraining(const std::string& id) {
+    for (auto& training : trainings) {
+        if (training.id == id) {
+            return &training;
+        }
+    }
+    return nullptr;
+}
+
+// ===== PAYMENT MANAGEMENT =====
 void SportsClubManager::addPayment(const std::string& athleteId, const std::string& athleteName,
                                    double amount, const std::string& date, bool isPaid) {
     payments.emplace_back(athleteId, athleteName, amount, date, isPaid);
@@ -70,6 +118,17 @@ std::vector<Payment>& SportsClubManager::getPayments() {
     return payments;
 }
 
+std::vector<Payment> SportsClubManager::getAthletePayments(const std::string& athleteId) {
+    std::vector<Payment> athletePayments;
+    for (const auto& payment : payments) {
+        if (payment.athleteId == athleteId) {
+            athletePayments.push_back(payment);
+        }
+    }
+    return athletePayments;
+}
+
+// ===== STATISTICS =====
 int SportsClubManager::getTotalAthletes() const {
     return athletes.size();
 }
@@ -104,6 +163,17 @@ double SportsClubManager::getMonthlyRevenue(const std::string& month) const {
     return total;
 }
 
+std::string SportsClubManager::getStatisticsString() const {
+    std::ostringstream oss;
+    oss << "=== СТАТИСТИКА КЛУБУ ===\n\n";
+    oss << "Всього спортсменів: " << getTotalAthletes() << "\n";
+    oss << "Загальний дохід: " << std::fixed << std::setprecision(2) << getTotalRevenue() << " грн\n";
+    oss << "Непроплачені платежі: " << getUnpaidPayments() << "\n";
+    oss << "Активних тренувань: " << trainings.size() << "\n";
+    return oss.str();
+}
+
+// ===== DATA PERSISTENCE =====
 void SportsClubManager::saveData() const {
     std::ofstream file("club_data.txt");
     if (!file.is_open()) return;
@@ -115,14 +185,12 @@ void SportsClubManager::saveData() const {
              << athlete.phone << "|" << athlete.monthlyFee << "|" << athlete.isPaid << "\n";
     }
 
-    // Save trainings
     file << "[TRAININGS]\n";
     for (const auto& training : trainings) {
         file << training.id << "|" << training.date << "|" << training.time << "|" 
              << training.trainer << "|" << training.location << "|" << training.participants << "\n";
     }
 
-    // Save payments
     file << "[PAYMENTS]\n";
     for (const auto& payment : payments) {
         file << payment.athleteId << "|" << payment.athleteName << "|" << payment.amount << "|" 
@@ -154,11 +222,56 @@ void SportsClubManager::loadData() {
         if (line.empty()) continue;
 
         if (section == "ATHLETES") {
-            // Parse athlete line
-        } else if (section == "TRAININGS") {
-            // Parse training line
-        } else if (section == "PAYMENTS") {
-            // Parse payment line
+            // Parse: id|name|category|phone|fee|isPaid
+            size_t pos = 0;
+            std::string tokens[6];
+            for (int i = 0; i < 6; i++) {
+                pos = line.find('|');
+                if (pos == std::string::npos) {
+                    tokens[i] = line;
+                    break;
+                }
+                tokens[i] = line.substr(0, pos);
+                line.erase(0, pos + 1);
+            }
+            if (!tokens[0].empty()) {
+                athletes.emplace_back(tokens[0], tokens[1], tokens[2], tokens[3], std::stod(tokens[4]));
+            }
+        }
+        else if (section == "TRAININGS") {
+            // Parse: id|date|time|trainer|location|participants
+            size_t pos = 0;
+            std::string tokens[6];
+            for (int i = 0; i < 6; i++) {
+                pos = line.find('|');
+                if (pos == std::string::npos) {
+                    tokens[i] = line;
+                    break;
+                }
+                tokens[i] = line.substr(0, pos);
+                line.erase(0, pos + 1);
+            }
+            if (!tokens[0].empty()) {
+                trainings.emplace_back(tokens[0], tokens[1], tokens[2], tokens[3], tokens[4], std::stoi(tokens[5]));
+            }
+        }
+        else if (section == "PAYMENTS") {
+            // Parse: athleteId|athleteName|amount|date|isPaid
+            size_t pos = 0;
+            std::string tokens[5];
+            for (int i = 0; i < 5; i++) {
+                pos = line.find('|');
+                if (pos == std::string::npos) {
+                    tokens[i] = line;
+                    break;
+                }
+                tokens[i] = line.substr(0, pos);
+                line.erase(0, pos + 1);
+            }
+            if (!tokens[0].empty()) {
+                bool isPaid = (tokens[4] == "1");
+                payments.emplace_back(tokens[0], tokens[1], std::stod(tokens[2]), tokens[3], isPaid);
+            }
         }
     }
 
